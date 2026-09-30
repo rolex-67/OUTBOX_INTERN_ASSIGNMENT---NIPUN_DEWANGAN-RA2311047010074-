@@ -4,6 +4,7 @@ import { redis, redisOptions } from '../lib/redis.js';
 import { sendEmail } from '../lib/mailer.js';
 import { db } from '../lib/db.js';
 import { env } from '../config/env.js';
+import { indexEmail } from '../lib/elastic.js';
 import { EmailJobData } from './producer.js';
 
 async function triggerSlackRateLimitAlert(sender: string, limit: number, userId?: string) {
@@ -96,12 +97,23 @@ export function createEmailWorker(concurrency = 5) {
       });
 
       try {
-        await db.emailJob.update({
+        const updated = await db.emailJob.update({
           where: { id: emailJobId },
           data: {
             status: 'SENT',
             sentAt: new Date(),
           },
+        });
+        await indexEmail({
+          emailJobId: updated.id,
+          userId: updated.userId || undefined,
+          sender: updated.sender,
+          recipient: updated.recipient,
+          subject: updated.subject,
+          body: updated.body,
+          status: updated.status,
+          scheduledAt: updated.scheduledAt.toISOString(),
+          sentAt: updated.sentAt ? updated.sentAt.toISOString() : null,
         });
       } catch (dbErr: any) {
         console.warn(`Could not update email job ${emailJobId} status to SENT:`, dbErr.message);
@@ -120,12 +132,23 @@ export function createEmailWorker(concurrency = 5) {
     console.error(`Email job ${job?.id} failed:`, err.message);
     if (job?.data?.emailJobId) {
       try {
-        await db.emailJob.update({
+        const failedJob = await db.emailJob.update({
           where: { id: job.data.emailJobId },
           data: {
             status: 'FAILED',
             error: err.message,
           },
+        });
+        await indexEmail({
+          emailJobId: failedJob.id,
+          userId: failedJob.userId || undefined,
+          sender: failedJob.sender,
+          recipient: failedJob.recipient,
+          subject: failedJob.subject,
+          body: failedJob.body,
+          status: failedJob.status,
+          scheduledAt: failedJob.scheduledAt.toISOString(),
+          sentAt: null,
         });
       } catch (dbErr: any) {
         console.warn(`Could not update email job ${job.data.emailJobId} status to FAILED:`, dbErr.message);
