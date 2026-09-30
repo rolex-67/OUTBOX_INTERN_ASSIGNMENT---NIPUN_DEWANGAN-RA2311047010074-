@@ -99,7 +99,23 @@ export async function googleLoginApi(userData: { email: string; name?: string; a
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(userData),
   });
-  if (!res.ok) throw new Error('Authentication failed');
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Authentication failed');
+  }
+  return res.json();
+}
+
+export async function directLoginApi(userData: { email: string; name?: string; avatar?: string }) {
+  const res = await fetch(`${API_URL}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(userData),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Authentication failed');
+  }
   return res.json();
 }
 

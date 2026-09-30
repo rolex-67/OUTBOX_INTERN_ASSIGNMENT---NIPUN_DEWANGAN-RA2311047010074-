@@ -182,23 +182,27 @@ apiRouter.get('/slack/status', async (req: Request, res: Response) => {
   });
 });
 
-apiRouter.post('/auth/google', async (req: Request, res: Response) => {
+const handleAuthLogin = async (req: Request, res: Response) => {
   const { email, name, avatar } = req.body;
 
   if (!email || typeof email !== 'string') {
-    return res.status(400).json({ error: 'Email is required' });
+    return res.status(400).json({ error: 'Valid email is required' });
   }
 
+  const sanitizedEmail = email.trim().toLowerCase();
+  const userName = name?.trim() || (sanitizedEmail.split('@')[0] || 'User');
+  const userAvatar = avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(userName)}`;
+
   const user = await db.user.upsert({
-    where: { email },
+    where: { email: sanitizedEmail },
     update: {
-      name: name ?? undefined,
-      avatar: avatar ?? undefined,
+      name: userName,
+      avatar: userAvatar,
     },
     create: {
-      email,
-      name: name ?? 'User',
-      avatar: avatar ?? '',
+      email: sanitizedEmail,
+      name: userName,
+      avatar: userAvatar,
     },
   });
 
@@ -223,7 +227,10 @@ apiRouter.post('/auth/google', async (req: Request, res: Response) => {
       slackWebhookUrl: user.slackWebhookUrl,
     },
   });
-});
+};
+
+apiRouter.post('/auth/google', handleAuthLogin);
+apiRouter.post('/auth/login', handleAuthLogin);
 
 apiRouter.get('/auth/me', async (req: Request, res: Response) => {
   const auth = getAuthUser(req);

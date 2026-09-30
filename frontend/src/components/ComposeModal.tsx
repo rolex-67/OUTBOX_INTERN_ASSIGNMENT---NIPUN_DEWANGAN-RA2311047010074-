@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Papa from 'papaparse';
-import { X, Upload, Users, Send, Clock, Gauge, FileText, CheckCircle2 } from 'lucide-react';
+import { X, Upload, Send, Clock, Gauge, CheckCircle2, Trash2 } from 'lucide-react';
 import { scheduleEmails, SchedulePayload } from '@/lib/api';
 
 interface ComposeModalProps {
@@ -24,6 +24,15 @@ export function ComposeModal({ isOpen, onClose, onSuccess, defaultSender }: Comp
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
+
+  function handleClearFile() {
+    setFileName(null);
+    setRecipients([]);
+    setError(null);
+    // reset the hidden file input so the same file can be re-selected
+    const input = document.getElementById('lead-file-upload') as HTMLInputElement | null;
+    if (input) input.value = '';
+  }
 
   if (!isOpen) return null;
 
@@ -67,7 +76,19 @@ export function ComposeModal({ isOpen, onClose, onSuccess, defaultSender }: Comp
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (recipients.length === 0) {
+
+    // Auto-flush any email still typed in the manual input field
+    let finalRecipients = [...recipients];
+    if (manualRecipientInput.trim()) {
+      const extra = extractEmails(manualRecipientInput);
+      finalRecipients = Array.from(new Set([...finalRecipients, ...extra]));
+      if (extra.length > 0) {
+        setRecipients(finalRecipients);
+        setManualRecipientInput('');
+      }
+    }
+
+    if (finalRecipients.length === 0) {
       setError('Please add at least one recipient email');
       return;
     }
@@ -82,7 +103,7 @@ export function ComposeModal({ isOpen, onClose, onSuccess, defaultSender }: Comp
     try {
       const payload: SchedulePayload = {
         sender: sender.trim(),
-        recipients,
+        recipients: finalRecipients,
         subject: subject.trim(),
         body: body.trim(),
         startTime: startTime ? new Date(startTime).toISOString() : undefined,
@@ -153,7 +174,7 @@ export function ComposeModal({ isOpen, onClose, onSuccess, defaultSender }: Comp
               )}
             </div>
 
-            <div className="border border-dashed border-slate-700 hover:border-indigo-500/60 rounded-xl p-4 text-center bg-slate-950/50 transition-colors">
+            <div className="border border-dashed border-slate-700 hover:border-indigo-500/60 rounded-xl p-4 text-center bg-slate-950/50 transition-colors relative">
               <input
                 type="file"
                 id="lead-file-upload"
@@ -161,6 +182,16 @@ export function ComposeModal({ isOpen, onClose, onSuccess, defaultSender }: Comp
                 onChange={handleFileUpload}
                 className="hidden"
               />
+              {fileName && (
+                <button
+                  type="button"
+                  onClick={handleClearFile}
+                  title="Remove file"
+                  className="absolute top-2 right-2 inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 hover:text-red-300 text-[10px] font-semibold transition-all"
+                >
+                  <Trash2 className="w-3 h-3" /> Remove
+                </button>
+              )}
               <label htmlFor="lead-file-upload" className="cursor-pointer block">
                 <Upload className="w-6 h-6 mx-auto mb-2 text-indigo-400" />
                 <span className="text-slate-300 font-medium">Click to upload CSV or text file</span>
@@ -176,6 +207,7 @@ export function ComposeModal({ isOpen, onClose, onSuccess, defaultSender }: Comp
                 type="text"
                 value={manualRecipientInput}
                 onChange={(e) => setManualRecipientInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddManualEmails(); } }}
                 placeholder="Or paste comma/space separated emails"
                 className="flex-1 px-3 py-1.5 rounded-lg bg-slate-950 border border-slate-800 text-slate-200 placeholder-slate-600 focus:outline-none focus:border-indigo-500 text-[11px]"
               />
@@ -267,11 +299,11 @@ export function ComposeModal({ isOpen, onClose, onSuccess, defaultSender }: Comp
             </button>
             <button
               type="submit"
-              disabled={submitting || recipients.length === 0}
+              disabled={submitting || (recipients.length === 0 && !manualRecipientInput.trim())}
               className="inline-flex items-center gap-2 px-5 py-2 font-semibold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl transition-all shadow-md shadow-indigo-600/20"
             >
               <Send className="w-3.5 h-3.5" />
-              <span>{submitting ? 'Scheduling Jobs...' : `Schedule ${recipients.length} Emails`}</span>
+              <span>{submitting ? 'Scheduling Jobs...' : `Schedule ${recipients.length + (manualRecipientInput.trim() ? 1 : 0)} Email${recipients.length !== 1 ? 's' : ''}`}</span>
             </button>
           </div>
         </form>
