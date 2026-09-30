@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import Papa from 'papaparse';
 import {
   ArrowLeft,
@@ -14,6 +14,8 @@ import {
   Italic,
   Underline,
   AlignLeft,
+  AlignCenter,
+  AlignRight,
   List,
   ListOrdered,
   Quote,
@@ -38,6 +40,98 @@ export function ComposeView({ onBack, onSuccess, defaultSender }: ComposeViewPro
   const [body, setBody] = useState('');
   const [delayBetweenSends, setDelayBetweenSends] = useState(2);
   const [hourlyLimit, setHourlyLimit] = useState(50);
+
+  // Rich Text Editor ref and active formatting state
+  const editorRef = useRef<HTMLDivElement>(null);
+  const [activeStyles, setActiveStyles] = useState({
+    bold: false,
+    italic: false,
+    underline: false,
+    strike: false,
+    align: 'left' as 'left' | 'center' | 'right',
+    heading: false,
+    quote: false,
+    listOrdered: false,
+    listUnordered: false,
+  });
+
+  function checkActiveStyles() {
+    if (typeof document === 'undefined') return;
+    try {
+      setActiveStyles({
+        bold: document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        underline: document.queryCommandState('underline'),
+        strike: document.queryCommandState('strikeThrough'),
+        align: document.queryCommandState('justifyCenter')
+          ? 'center'
+          : document.queryCommandState('justifyRight')
+          ? 'right'
+          : 'left',
+        heading: document.queryCommandValue('formatBlock') === 'h3',
+        quote: document.queryCommandValue('formatBlock') === 'blockquote',
+        listOrdered: document.queryCommandState('insertOrderedList'),
+        listUnordered: document.queryCommandState('insertUnorderedList'),
+      });
+    } catch {}
+  }
+
+  function handleEditorInput() {
+    if (!editorRef.current) return;
+    setBody(editorRef.current.innerHTML);
+    checkActiveStyles();
+  }
+
+  function execCmd(command: string, value: string | undefined = undefined) {
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+    document.execCommand(command, false, value);
+    handleEditorInput();
+  }
+
+  function toggleHeading() {
+    if (editorRef.current) editorRef.current.focus();
+    const current = document.queryCommandValue('formatBlock');
+    if (current === 'h3') {
+      document.execCommand('formatBlock', false, '<p>');
+    } else {
+      document.execCommand('formatBlock', false, '<h3>');
+    }
+    handleEditorInput();
+  }
+
+  function toggleQuote() {
+    if (editorRef.current) editorRef.current.focus();
+    const current = document.queryCommandValue('formatBlock');
+    if (current === 'blockquote') {
+      document.execCommand('formatBlock', false, '<p>');
+    } else {
+      document.execCommand('formatBlock', false, '<blockquote>');
+    }
+    handleEditorInput();
+  }
+
+  function cycleAlign() {
+    if (editorRef.current) editorRef.current.focus();
+    if (activeStyles.align === 'left') {
+      document.execCommand('justifyCenter');
+    } else if (activeStyles.align === 'center') {
+      document.execCommand('justifyRight');
+    } else {
+      document.execCommand('justifyLeft');
+    }
+    handleEditorInput();
+  }
+
+  function handleInsertLink() {
+    if (editorRef.current) editorRef.current.focus();
+    const url = window.prompt('Enter web address / URL (e.g. https://reachinbox.ai):', 'https://');
+    if (url && url.trim() && url !== 'https://') {
+      document.execCommand('createLink', false, url.trim());
+      handleEditorInput();
+    }
+  }
 
   // Attachments state
   const [attachments, setAttachments] = useState<EmailAttachment[]>([]);
@@ -163,6 +257,14 @@ export function ComposeView({ onBack, onSuccess, defaultSender }: ComposeViewPro
       return;
     }
 
+    const htmlContent = editorRef.current?.innerHTML.trim() || body.trim();
+    const plainText = editorRef.current?.innerText.trim() || body.trim();
+
+    if (!plainText && (!htmlContent || htmlContent === '<br>')) {
+      setError('Please write an email message body');
+      return;
+    }
+
     setSubmitting(true);
     setError(null);
 
@@ -171,7 +273,7 @@ export function ComposeView({ onBack, onSuccess, defaultSender }: ComposeViewPro
         sender,
         recipients: finalRecipients,
         subject: subject.trim(),
-        body: body.trim() || 'Hi there, following up on our previous conversation.',
+        body: htmlContent || 'Hi there, following up on our previous conversation.',
         attachments: attachments.length > 0 ? attachments : undefined,
         startTime: scheduledTime || undefined,
         delayBetweenEmailsMs: delayBetweenSends * 1000,
@@ -518,79 +620,214 @@ export function ComposeView({ onBack, onSuccess, defaultSender }: ComposeViewPro
         )}
 
         {/* RICH TEXT EDITOR CARD (Matches Image 5 & 6) */}
-        <div className="rounded-2xl border border-gray-100 bg-[#F9FAFB] p-4 space-y-3 min-h-[360px] flex flex-col shadow-sm">
+        <div className="rounded-2xl border border-gray-100 bg-[#F9FAFB] p-4 space-y-3 min-h-[360px] flex flex-col shadow-sm relative">
           {/* Editor Toolbar */}
-          <div className="flex items-center gap-1 sm:gap-2 px-3 py-2 bg-white rounded-xl border border-gray-200/80 text-gray-600 text-xs shadow-sm overflow-x-auto">
-            <button type="button" className="p-1 hover:text-gray-900 rounded">
+          <div className="flex items-center gap-1 sm:gap-1.5 px-3 py-2 bg-white rounded-xl border border-gray-200/80 text-gray-600 text-xs shadow-sm overflow-x-auto select-none">
+            {/* Undo */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => execCmd('undo')}
+              className="p-1.5 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+              title="Undo (Ctrl+Z)"
+            >
               <Undo className="w-3.5 h-3.5" />
             </button>
-            <button type="button" className="p-1 hover:text-gray-900 rounded">
+            {/* Redo */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => execCmd('redo')}
+              className="p-1.5 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+              title="Redo (Ctrl+Y)"
+            >
               <Redo className="w-3.5 h-3.5" />
             </button>
 
             <span className="h-4 w-px bg-gray-200 mx-1"></span>
 
-            <button type="button" className="px-1.5 py-0.5 hover:text-gray-900 font-semibold rounded">
+            {/* Typography / Heading Toggle */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={toggleHeading}
+              className={`px-2 py-1 rounded font-bold text-xs transition-colors ${
+                activeStyles.heading
+                  ? 'bg-[#E6F4EA] text-[#00A854]'
+                  : 'hover:text-gray-900 hover:bg-gray-100'
+              }`}
+              title="Heading (Title Style)"
+            >
               TT
             </button>
 
             <span className="h-4 w-px bg-gray-200 mx-1"></span>
 
-            <button type="button" className="p-1 hover:text-gray-900 rounded font-bold">
+            {/* Bold */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => execCmd('bold')}
+              className={`p-1.5 rounded transition-colors font-bold ${
+                activeStyles.bold
+                  ? 'bg-[#E6F4EA] text-[#00A854]'
+                  : 'hover:text-gray-900 hover:bg-gray-100'
+              }`}
+              title="Bold (Ctrl+B)"
+            >
               <Bold className="w-3.5 h-3.5" />
             </button>
-            <button type="button" className="p-1 hover:text-gray-900 rounded italic">
+            {/* Italic */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => execCmd('italic')}
+              className={`p-1.5 rounded transition-colors italic ${
+                activeStyles.italic
+                  ? 'bg-[#E6F4EA] text-[#00A854]'
+                  : 'hover:text-gray-900 hover:bg-gray-100'
+              }`}
+              title="Italic (Ctrl+I)"
+            >
               <Italic className="w-3.5 h-3.5" />
             </button>
-            <button type="button" className="p-1 hover:text-gray-900 rounded underline">
+            {/* Underline */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => execCmd('underline')}
+              className={`p-1.5 rounded transition-colors underline ${
+                activeStyles.underline
+                  ? 'bg-[#E6F4EA] text-[#00A854]'
+                  : 'hover:text-gray-900 hover:bg-gray-100'
+              }`}
+              title="Underline (Ctrl+U)"
+            >
               <Underline className="w-3.5 h-3.5" />
             </button>
 
             <span className="h-4 w-px bg-gray-200 mx-1"></span>
 
-            <button type="button" className="p-1 hover:text-gray-900 rounded">
-              <AlignLeft className="w-3.5 h-3.5" />
+            {/* Alignment Cycle */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={cycleAlign}
+              className="p-1.5 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors flex items-center gap-1"
+              title={`Text Alignment (${activeStyles.align})`}
+            >
+              {activeStyles.align === 'center' ? (
+                <AlignCenter className="w-3.5 h-3.5 text-[#00A854]" />
+              ) : activeStyles.align === 'right' ? (
+                <AlignRight className="w-3.5 h-3.5 text-[#00A854]" />
+              ) : (
+                <AlignLeft className="w-3.5 h-3.5" />
+              )}
             </button>
-            <button type="button" className="p-1 hover:text-gray-900 rounded">
+
+            {/* Numbered List */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => execCmd('insertOrderedList')}
+              className={`p-1.5 rounded transition-colors ${
+                activeStyles.listOrdered
+                  ? 'bg-[#E6F4EA] text-[#00A854]'
+                  : 'hover:text-gray-900 hover:bg-gray-100'
+              }`}
+              title="Numbered List"
+            >
               <ListOrdered className="w-3.5 h-3.5" />
             </button>
-            <button type="button" className="p-1 hover:text-gray-900 rounded">
+
+            {/* Bullet List */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => execCmd('insertUnorderedList')}
+              className={`p-1.5 rounded transition-colors ${
+                activeStyles.listUnordered
+                  ? 'bg-[#E6F4EA] text-[#00A854]'
+                  : 'hover:text-gray-900 hover:bg-gray-100'
+              }`}
+              title="Bullet List"
+            >
               <List className="w-3.5 h-3.5" />
             </button>
 
             <span className="h-4 w-px bg-gray-200 mx-1"></span>
 
-            <button type="button" className="p-1 hover:text-gray-900 rounded">
+            {/* Blockquote */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={toggleQuote}
+              className={`p-1.5 rounded transition-colors ${
+                activeStyles.quote
+                  ? 'bg-[#E6F4EA] text-[#00A854]'
+                  : 'hover:text-gray-900 hover:bg-gray-100'
+              }`}
+              title="Quote"
+            >
               <Quote className="w-3.5 h-3.5" />
             </button>
-            <button type="button" className="p-1 hover:text-gray-900 rounded">
+
+            {/* Insert Link */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={handleInsertLink}
+              className="p-1.5 hover:text-[#00A854] hover:bg-gray-100 rounded transition-colors"
+              title="Insert Link"
+            >
               <LinkIcon className="w-3.5 h-3.5" />
             </button>
-            <button type="button" className="p-1 hover:text-gray-900 rounded">
+
+            {/* Strikethrough */}
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => execCmd('strikeThrough')}
+              className={`p-1.5 rounded transition-colors ${
+                activeStyles.strike
+                  ? 'bg-[#E6F4EA] text-[#00A854]'
+                  : 'hover:text-gray-900 hover:bg-gray-100'
+              }`}
+              title="Strikethrough"
+            >
               <Strikethrough className="w-3.5 h-3.5" />
             </button>
 
             <span className="h-4 w-px bg-gray-200 mx-1"></span>
 
+            {/* Attach files action */}
             <button
               type="button"
               onClick={() => document.getElementById('compose-file-attachments')?.click()}
-              className="p-1 hover:text-[#00A854] rounded flex items-center gap-1 text-[11px] text-gray-500"
+              className="p-1.5 hover:text-[#00A854] hover:bg-[#E6F4EA]/50 rounded flex items-center gap-1.5 text-[11px] text-gray-600 transition-colors"
               title="Attach files"
             >
-              <Paperclip className="w-3.5 h-3.5" />
-              <span>Attach</span>
+              <Paperclip className="w-3.5 h-3.5 text-[#00A854]" />
+              <span className="font-medium">Attach</span>
             </button>
           </div>
 
-          {/* Text Area */}
-          <textarea
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            placeholder="Type Your Reply..."
-            rows={12}
-            className="flex-1 w-full bg-transparent border-none text-xs text-gray-800 placeholder-gray-400 focus:outline-none resize-none leading-relaxed p-1"
-          />
+          {/* Rich Contenteditable Editor */}
+          <div className="relative flex-1 flex flex-col min-h-[220px]">
+            {(!body || body === '<br>' || body.trim() === '') && (
+              <span className="absolute left-2 top-2 text-xs text-gray-400 pointer-events-none select-none">
+                Type Your Reply...
+              </span>
+            )}
+            <div
+              ref={editorRef}
+              contentEditable
+              onInput={handleEditorInput}
+              onKeyUp={checkActiveStyles}
+              onMouseUp={checkActiveStyles}
+              className="flex-1 w-full bg-transparent border-none text-xs text-gray-800 focus:outline-none min-h-[220px] leading-relaxed p-2 [&_blockquote]:border-l-4 [&_blockquote]:border-[#00A854] [&_blockquote]:pl-3 [&_blockquote]:py-1 [&_blockquote]:my-2 [&_blockquote]:bg-gray-50 [&_blockquote]:italic [&_blockquote]:text-gray-700 [&_ul]:list-disc [&_ul]:pl-5 [&_ol]:list-decimal [&_ol]:pl-5 [&_a]:text-[#00A854] [&_a]:underline [&_h3]:text-sm [&_h3]:font-bold [&_h3]:my-2"
+            />
+          </div>
         </div>
       </div>
     </div>
