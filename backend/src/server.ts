@@ -34,6 +34,20 @@ app.use('/admin/queues', serverAdapter.getRouter());
 // REST APIs
 app.use('/api', apiRouter);
 
+app.get('/', (_req: Request, res: Response) => {
+  res.json({
+    project: 'ReachInbox / Outbox Email Job Scheduler Backend',
+    status: 'ONLINE',
+    author: 'Nipun Dewangan (RA2311047010074)',
+    endpoints: {
+      health: '/health',
+      queues_dashboard: '/admin/queues',
+      api: '/api',
+    },
+    uptime: `${Math.floor(process.uptime())}s`,
+  });
+});
+
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
