@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Clock, Star, Mail } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { Clock, Star, Mail, Paperclip } from 'lucide-react';
 import { EmailItem } from '@/lib/api';
 
 interface EmailTableProps {
@@ -21,9 +21,26 @@ export function EmailTable({
 }: EmailTableProps) {
   const [starred, setStarred] = useState<Record<string, boolean>>({});
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      const stored = JSON.parse(localStorage.getItem('reachinbox_starred') || '{}');
+      setStarred(stored);
+    } catch {}
+  }, []);
+
   function toggleStar(e: React.MouseEvent, id: string) {
     e.stopPropagation();
-    setStarred((prev) => ({ ...prev, [id]: !prev[id] }));
+    setStarred((prev) => {
+      const updated = { ...prev, [id]: !prev[id] };
+      if (!updated[id]) {
+        delete updated[id];
+      }
+      try {
+        localStorage.setItem('reachinbox_starred', JSON.stringify(updated));
+      } catch {}
+      return updated;
+    });
   }
 
   function formatScheduledBadge(isoString?: string | null) {
@@ -124,11 +141,16 @@ export function EmailTable({
               </div>
 
               {/* Subject & Preview Snippet */}
-              <div className="text-xs text-gray-800 truncate flex-1 min-w-0">
-                <span className="font-semibold text-gray-900">{email.subject || 'No Subject'}</span>
+              <div className="text-xs text-gray-800 truncate flex-1 min-w-0 flex items-center gap-1.5">
+                {email.attachments && email.attachments.length > 0 && (
+                  <span title={`${email.attachments.length} attachment(s)`}>
+                    <Paperclip className="w-3.5 h-3.5 text-gray-400 shrink-0" />
+                  </span>
+                )}
+                <span className="font-semibold text-gray-900 truncate">{email.subject || 'No Subject'}</span>
                 {email.body && (
-                  <span className="text-gray-400 font-normal ml-1.5">
-                    - {email.body.replace(/\n/g, ' ')}
+                  <span className="text-gray-400 font-normal truncate">
+                    - {email.body.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()}
                   </span>
                 )}
               </div>
