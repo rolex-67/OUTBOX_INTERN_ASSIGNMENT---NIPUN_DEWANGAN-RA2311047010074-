@@ -25,8 +25,8 @@ export default function LoginPage() {
   const [loginMethod, setLoginMethod] = useState<'direct' | 'google'>('direct');
 
   // Direct login form fields
-  const [email, setEmail] = useState('reviewer@reachinbox.ai');
-  const [name, setName] = useState('ReachInbox Reviewer');
+  const [email, setEmail] = useState('');
+  const [name, setName] = useState('');
 
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
 
@@ -115,10 +115,6 @@ export default function LoginPage() {
     }
   }
 
-  function applyPreset(presetEmail: string, presetName: string) {
-    setEmail(presetEmail);
-    setName(presetName);
-  }
 
   return (
     <div className="relative min-h-screen flex flex-col justify-center items-center px-4 py-8 overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
@@ -140,30 +136,27 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Evaluation Banner for Reviewers */}
+        {/* Instant Access Banner */}
         <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-indigo-900/40 border border-indigo-500/30 shadow-lg backdrop-blur-md">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-start gap-2.5">
               <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse mt-1 shrink-0" />
               <div>
                 <div className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
-                  Assignment Reviewer Fast-Track
-                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
-                    No Setup Required
-                  </span>
+                  Instant Demo Access
                 </div>
                 <div className="text-[11px] text-slate-300 mt-0.5">
-                  Evaluating this submission? Enter with 1-click without configuring Google credentials.
+                  Skip sign-in and jump straight into the dashboard demo.
                 </div>
               </div>
             </div>
             <button
-              onClick={() => handleLogin('reviewer@reachinbox.ai', 'ReachInbox Reviewer')}
+              onClick={() => handleLogin('demo@reachinbox.ai', 'Demo User')}
               disabled={loading}
               className="shrink-0 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-md shadow-indigo-600/30 flex items-center gap-1.5 transition-all duration-150 active:scale-95"
             >
               <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>{loading ? 'Entering...' : '1-Click Enter'}</span>
+              <span>{loading ? 'Entering...' : '1-Click Demo'}</span>
             </button>
           </div>
         </div>
@@ -185,7 +178,7 @@ export default function LoginPage() {
               }`}
             >
               <Mail className="w-3.5 h-3.5" />
-              <span>Direct Sign In (Reviewer)</span>
+              <span>Email Sign In</span>
             </button>
             <button
               type="button"
@@ -231,7 +224,7 @@ export default function LoginPage() {
                     required
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="e.g. reviewer@reachinbox.ai"
+                    placeholder="you@company.ai"
                     className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
                   />
                 </div>
@@ -239,7 +232,7 @@ export default function LoginPage() {
 
               <div>
                 <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Full Name / Role
+                  Full Name
                 </label>
                 <div className="relative">
                   <User className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -247,39 +240,9 @@ export default function LoginPage() {
                     type="text"
                     value={name}
                     onChange={(e) => setName(e.target.value)}
-                    placeholder="e.g. Mitrajit / ReachInbox Reviewer"
+                    placeholder="Your Name (optional)"
                     className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
                   />
-                </div>
-              </div>
-
-              {/* Quick Fill Presets */}
-              <div>
-                <span className="block text-[11px] text-slate-400 mb-1.5 font-medium">
-                  Quick-fill profile for testing:
-                </span>
-                <div className="flex flex-wrap gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('mitrajit@reachinbox.ai', 'Mitrajit (Reviewer)')}
-                    className="px-2.5 py-1 rounded-lg bg-slate-800/70 hover:bg-slate-800 text-slate-300 border border-slate-700/60 text-[11px] transition-colors"
-                  >
-                    👤 Mitrajit (Reviewer)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('reviewer@reachinbox.ai', 'ReachInbox Evaluator')}
-                    className="px-2.5 py-1 rounded-lg bg-slate-800/70 hover:bg-slate-800 text-slate-300 border border-slate-700/60 text-[11px] transition-colors"
-                  >
-                    🚀 ReachInbox Evaluator
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => applyPreset('growth@outboxlabs.com', 'Growth Lead')}
-                    className="px-2.5 py-1 rounded-lg bg-slate-800/70 hover:bg-slate-800 text-slate-300 border border-slate-700/60 text-[11px] transition-colors"
-                  >
-                    📈 Growth Lead
-                  </button>
                 </div>
               </div>
 
