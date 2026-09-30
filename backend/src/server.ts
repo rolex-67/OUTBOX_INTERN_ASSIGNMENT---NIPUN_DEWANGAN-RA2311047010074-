@@ -38,9 +38,45 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', uptime: process.uptime() });
 });
 
+import { db } from './lib/db.js';
+import { scheduleEmailJob } from './queue/producer.js';
+
 // Initialize worker and search
 const worker = createEmailWorker(5);
 initElasticsearch().catch((err) => console.warn('ES Init error:', err.message));
+
+async function reconcilePendingJobsOnStartup() {
+  try {
+    const pendingJobs = await db.emailJob.findMany({
+      where: { status: 'SCHEDULED' },
+    });
+    if (pendingJobs.length > 0) {
+      console.log(`[Startup Recovery] Found ${pendingJobs.length} SCHEDULED jobs in MySQL.`);
+      for (const job of pendingJobs) {
+        const bullJob = await q.getJob(job.id);
+        if (!bullJob) {
+          console.log(`[Startup Recovery] Restoring BullMQ job for ${job.recipient} (scheduled for ${job.scheduledAt})`);
+          await scheduleEmailJob(
+            {
+              emailJobId: job.id,
+              sender: job.sender,
+              recipient: job.recipient,
+              subject: job.subject,
+              body: job.body,
+              attachments: job.attachments ? JSON.parse(job.attachments) : undefined,
+              scheduledAt: job.scheduledAt.toISOString(),
+            },
+            job.scheduledAt
+          );
+        }
+      }
+    }
+  } catch (err: any) {
+    console.warn('Startup job reconciliation notice:', err.message);
+  }
+}
+
+reconcilePendingJobsOnStartup();
 
 const server = app.listen(env.PORT, () => {
   console.log(`ReachInbox Scheduler backend running on port ${env.PORT}`);
