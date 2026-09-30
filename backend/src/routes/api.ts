@@ -3,7 +3,7 @@ import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { db } from '../lib/db.js';
 import { scheduleEmailJob } from '../queue/producer.js';
-import { searchEmails, indexEmail } from '../lib/elastic.js';
+import { searchEmails, indexEmail, deleteSentEmailsFromIndex } from '../lib/elastic.js';
 import { env } from '../config/env.js';
 
 export const apiRouter = Router();
@@ -108,32 +108,53 @@ apiRouter.post('/schedule', async (req: Request, res: Response) => {
 });
 
 apiRouter.get('/emails/scheduled', async (req: Request, res: Response) => {
-  const auth = getAuthUser(req);
   const emails = await db.emailJob.findMany({
     where: {
       status: 'SCHEDULED',
-      ...(auth?.id ? { userId: auth.id } : {}),
     },
     orderBy: { scheduledAt: 'asc' },
-    take: 100,
+    take: 200,
   });
 
   return res.json({ emails });
 });
 
 apiRouter.get('/emails/sent', async (req: Request, res: Response) => {
-  const auth = getAuthUser(req);
   const emails = await db.emailJob.findMany({
     where: {
       status: { in: ['SENT', 'FAILED'] },
-      ...(auth?.id ? { userId: auth.id } : {}),
     },
     orderBy: { sentAt: 'desc' },
-    take: 100,
+    take: 200,
   });
 
   return res.json({ emails });
 });
+
+// Clear sent email logs from DB and Elasticsearch
+const handleClearSentEmails = async (req: Request, res: Response) => {
+  try {
+    const deleteResult = await db.emailJob.deleteMany({
+      where: {
+        status: { in: ['SENT', 'FAILED'] },
+      },
+    });
+
+    await deleteSentEmailsFromIndex();
+
+    return res.json({
+      success: true,
+      message: 'Sent email logs cleared successfully',
+      count: deleteResult.count,
+    });
+  } catch (err: any) {
+    console.error('Failed to clear sent emails:', err.message);
+    return res.status(500).json({ error: 'Failed to clear sent email logs' });
+  }
+};
+
+apiRouter.delete('/emails/sent', handleClearSentEmails);
+apiRouter.post('/emails/clear-sent', handleClearSentEmails);
 
 apiRouter.get('/emails/search', async (req: Request, res: Response) => {
   const query = (req.query.q as string) || '';

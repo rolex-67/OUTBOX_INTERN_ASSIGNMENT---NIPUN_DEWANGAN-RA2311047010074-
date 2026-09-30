@@ -2,13 +2,14 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Plus, Search, RefreshCw, Send, Clock, CheckCircle2, AlertTriangle, Layers } from 'lucide-react';
+import { Plus, Search, RefreshCw, Send, Clock, CheckCircle2, AlertTriangle, Layers, Trash2 } from 'lucide-react';
 import { Header } from '@/components/Header';
 import { EmailTable } from '@/components/EmailTable';
 import { ComposeModal } from '@/components/ComposeModal';
 import {
   fetchScheduledEmails,
   fetchSentEmails,
+  clearSentEmailsApi,
   searchEmails,
   getSlackStatus,
   EmailItem,
@@ -27,6 +28,7 @@ export default function DashboardPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [searching, setSearching] = useState(false);
+  const [clearingSent, setClearingSent] = useState(false);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
 
   // Authentication check
@@ -88,6 +90,24 @@ export default function DashboardPage() {
   function handleClearSearch() {
     setSearchQuery('');
     setSearchResults(null);
+  }
+
+  async function handleClearSent() {
+    if (!window.confirm('Are you sure you want to permanently clear all sent email logs? This will delete them from the database.')) {
+      return;
+    }
+    setClearingSent(true);
+    try {
+      await clearSentEmailsApi();
+      setSentEmails([]);
+      if (searchResults) {
+        setSearchResults(searchResults.filter((e) => e.status === 'SCHEDULED'));
+      }
+    } catch (err: any) {
+      alert(err.message || 'Failed to clear sent email logs');
+    } finally {
+      setClearingSent(false);
+    }
   }
 
   const currentList =
@@ -176,43 +196,57 @@ export default function DashboardPage() {
 
         {/* Search & Tabs Controls */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 pt-2">
-          {/* Tabs */}
-          <div className="flex items-center gap-1 p-1 bg-slate-900/80 border border-slate-800 rounded-xl max-w-fit">
-            <button
-              onClick={() => {
-                setActiveTab('scheduled');
-                setSearchResults(null);
-              }}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                activeTab === 'scheduled' && searchResults === null
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Clock className="w-3.5 h-3.5" />
-              <span>Scheduled</span>
-              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-950/60 font-mono">
-                {scheduledEmails.length}
-              </span>
-            </button>
+          {/* Tabs and Actions */}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="flex items-center gap-1 p-1 bg-slate-900/80 border border-slate-800 rounded-xl max-w-fit">
+              <button
+                onClick={() => {
+                  setActiveTab('scheduled');
+                  setSearchResults(null);
+                }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  activeTab === 'scheduled' && searchResults === null
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>Scheduled</span>
+                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-950/60 font-mono">
+                  {scheduledEmails.length}
+                </span>
+              </button>
 
-            <button
-              onClick={() => {
-                setActiveTab('sent');
-                setSearchResults(null);
-              }}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
-                activeTab === 'sent' && searchResults === null
-                  ? 'bg-indigo-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Send className="w-3.5 h-3.5" />
-              <span>Sent Emails</span>
-              <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-950/60 font-mono">
-                {sentEmails.length}
-              </span>
-            </button>
+              <button
+                onClick={() => {
+                  setActiveTab('sent');
+                  setSearchResults(null);
+                }}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+                  activeTab === 'sent' && searchResults === null
+                    ? 'bg-indigo-600 text-white shadow-md'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Sent Emails</span>
+                <span className="ml-1 px-1.5 py-0.2 rounded-full text-[10px] bg-slate-950/60 font-mono">
+                  {sentEmails.length}
+                </span>
+              </button>
+            </div>
+
+            {activeTab === 'sent' && sentEmails.length > 0 && (
+              <button
+                onClick={handleClearSent}
+                disabled={clearingSent}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-red-400 hover:text-red-300 text-xs font-semibold rounded-xl transition-all disabled:opacity-50"
+                title="Clear sent email logs from database & dashboard"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>{clearingSent ? 'Clearing...' : 'Clear Sent Logs'}</span>
+              </button>
+            )}
           </div>
 
           {/* Elasticsearch Search Form */}

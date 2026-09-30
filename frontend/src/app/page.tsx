@@ -348,9 +348,17 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <p className="mt-4 text-center text-[11px] text-slate-500">
-          ReachInbox Hiring Assignment • Monorepo Evaluation Build
-        </p>
+        <div className="mt-5 text-center space-y-1">
+          <p className="text-xs font-bold tracking-wider text-slate-300 uppercase">
+            MADE BY NIPUN DEWANGAN
+          </p>
+          <p className="text-[11px] font-mono font-medium text-indigo-400 tracking-wider">
+            RA2311047010074
+          </p>
+          <p className="text-[10px] text-slate-500">
+            ReachInbox Hiring Assignment • Full-stack Email Job Scheduler
+          </p>
+        </div>
       </div>
     </div>
   );

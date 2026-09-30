@@ -131,3 +131,22 @@ export async function searchEmails(query: string, userId?: string) {
     sentAt: r.sentAt ? r.sentAt.toISOString() : null,
   }));
 }
+
+export async function deleteSentEmailsFromIndex() {
+  if (!isElasticAvailable) return;
+  try {
+    await es.deleteByQuery({
+      index: INDEX_NAME,
+      query: {
+        terms: {
+          status: ['SENT', 'FAILED'],
+        },
+      },
+      refresh: true,
+    });
+    console.log('Cleared sent emails from Elasticsearch index');
+  } catch (err: any) {
+    console.warn('Failed to clear sent emails from ES index:', err.message);
+  }
+}
+

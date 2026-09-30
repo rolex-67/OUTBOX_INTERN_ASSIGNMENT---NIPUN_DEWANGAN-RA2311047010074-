@@ -47,6 +47,24 @@ export async function fetchSentEmails(): Promise<EmailItem[]> {
   return data.emails;
 }
 
+export async function clearSentEmailsApi(): Promise<{ success: boolean; count?: number }> {
+  let res = await fetch(`${API_URL}/emails/sent`, {
+    method: 'DELETE',
+    headers: { ...getAuthHeader() },
+  });
+  if (!res.ok) {
+    res = await fetch(`${API_URL}/emails/clear-sent`, {
+      method: 'POST',
+      headers: { ...getAuthHeader() },
+    });
+  }
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to clear sent emails');
+  }
+  return res.json();
+}
+
 export async function searchEmails(query: string): Promise<EmailItem[]> {
   const res = await fetch(`${API_URL}/emails/search?q=${encodeURIComponent(query)}`, {
     headers: { ...getAuthHeader() },
