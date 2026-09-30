@@ -127,15 +127,89 @@ export default function DashboardPage() {
     }
   }
 
+  // Live Instant Search Effect: Instant client filter + Debounced server query
+  useEffect(() => {
+    const q = searchQuery.trim();
+    if (!q) {
+      setSearchResults(null);
+      return;
+    }
+
+    // 1. Immediate client search across current memory
+    const lowerQ = q.toLowerCase();
+    const allLoaded = [...scheduledEmails, ...sentEmails];
+    const localMatches = allLoaded.filter((e) => {
+      const subject = (e.subject || '').toLowerCase();
+      const recipient = (e.recipient || '').toLowerCase();
+      const sender = (e.sender || '').toLowerCase();
+      const body = (e.body || '').replace(/<[^>]*>/g, ' ').toLowerCase();
+      return (
+        subject.includes(lowerQ) ||
+        recipient.includes(lowerQ) ||
+        sender.includes(lowerQ) ||
+        body.includes(lowerQ)
+      );
+    });
+
+    setSearchResults(localMatches);
+
+    // 2. Debounced backend search for complete historical DB & ES index
+    const timer = setTimeout(async () => {
+      try {
+        const serverResults = await searchEmails(q);
+        if (serverResults) {
+          const seen = new Set<string>();
+          const combined: EmailItem[] = [];
+
+          for (const item of [...serverResults, ...localMatches]) {
+            const key = item.id || item.emailJobId || `${item.recipient}-${item.subject}`;
+            if (!seen.has(key)) {
+              seen.add(key);
+              combined.push(item);
+            }
+          }
+          setSearchResults(combined);
+        }
+      } catch (err: any) {
+        console.warn('Backend search query warning:', err.message);
+      }
+    }, 200);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery, scheduledEmails, sentEmails]);
+
   async function handleSearch(e: React.FormEvent) {
     e.preventDefault();
-    if (!searchQuery.trim()) {
+    const q = searchQuery.trim();
+    if (!q) {
       setSearchResults(null);
       return;
     }
     try {
-      const results = await searchEmails(searchQuery.trim());
-      setSearchResults(results);
+      const results = await searchEmails(q);
+      const lowerQ = q.toLowerCase();
+      const localMatches = [...scheduledEmails, ...sentEmails].filter((item) => {
+        const subject = (item.subject || '').toLowerCase();
+        const recipient = (item.recipient || '').toLowerCase();
+        const sender = (item.sender || '').toLowerCase();
+        const body = (item.body || '').replace(/<[^>]*>/g, ' ').toLowerCase();
+        return (
+          subject.includes(lowerQ) ||
+          recipient.includes(lowerQ) ||
+          sender.includes(lowerQ) ||
+          body.includes(lowerQ)
+        );
+      });
+      const seen = new Set<string>();
+      const combined: EmailItem[] = [];
+      for (const item of [...(results || []), ...localMatches]) {
+        const key = item.id || item.emailJobId || `${item.recipient}-${item.subject}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          combined.push(item);
+        }
+      }
+      setSearchResults(combined);
     } catch (err: any) {
       console.error('Search failed:', err.message);
     }
@@ -693,6 +767,28 @@ export default function DashboardPage() {
                   className="text-[11px] text-[#00A854] hover:underline font-semibold ml-auto"
                 >
                   Clear all
+                </button>
+              </div>
+            )}
+
+            {/* Search Query Banner */}
+            {searchQuery.trim() && (
+              <div className="px-6 py-2.5 bg-emerald-50/70 border-b border-emerald-100 flex items-center justify-between text-xs text-emerald-800">
+                <span className="flex items-center gap-2">
+                  <Search className="w-3.5 h-3.5 text-[#00A854]" />
+                  <span>
+                    Results for &quot;<strong>{searchQuery}</strong>&quot; ({currentList.length} matching email{currentList.length === 1 ? '' : 's'})
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setSearchResults(null);
+                  }}
+                  className="text-emerald-700 hover:text-emerald-900 font-semibold underline text-[11px]"
+                >
+                  Clear Search
                 </button>
               </div>
             )}

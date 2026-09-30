@@ -128,10 +128,14 @@ export function EmailTable({
 
               {/* Status / Scheduled Time Badge */}
               <div className="shrink-0">
-                {type === 'scheduled' ? (
+                {email.status === 'SCHEDULED' || (!email.status && type === 'scheduled') ? (
                   <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#FFF7ED] border border-[#FFEDD5] text-[#EA580C] text-[11px] font-medium whitespace-nowrap">
                     <Clock className="w-3 h-3 text-[#EA580C]" />
                     <span>{formatScheduledBadge(email.scheduledAt)}</span>
+                  </span>
+                ) : email.status === 'FAILED' ? (
+                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-red-100 text-red-600 text-[11px] font-medium whitespace-nowrap">
+                    Failed
                   </span>
                 ) : (
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full bg-gray-100 text-gray-600 text-[11px] font-medium whitespace-nowrap">

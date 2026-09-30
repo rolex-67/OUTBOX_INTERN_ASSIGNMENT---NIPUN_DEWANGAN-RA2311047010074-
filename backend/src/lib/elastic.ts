@@ -68,22 +68,21 @@ export async function indexEmail(doc: EmailDoc) {
   }
 }
 
-export async function searchEmails(query: string, userId?: string) {
+export async function searchEmails(query: string, _userId?: string) {
+  const cleanQuery = query.trim();
+  if (!cleanQuery) return [];
+
   if (isElasticAvailable) {
     try {
       const mustClauses: any[] = [
         {
           multi_match: {
-            query,
+            query: cleanQuery,
             fields: ['subject^3', 'body', 'recipient^2', 'sender'],
             fuzziness: 'AUTO',
           },
         },
       ];
-
-      if (userId) {
-        mustClauses.push({ term: { userId } });
-      }
 
       const res = await es.search<EmailDoc>({
         index: INDEX_NAME,
@@ -94,7 +93,12 @@ export async function searchEmails(query: string, userId?: string) {
         },
       });
 
-      return res.hits.hits.map((h) => h._source);
+      return res.hits.hits
+        .filter((h): h is typeof h & { _source: EmailDoc } => Boolean(h._source))
+        .map((h) => ({
+          id: h._source.emailJobId,
+          ...h._source,
+        }));
     } catch (err: any) {
       console.warn('ES search failed, falling back to database query:', err.message);
     }
@@ -103,32 +107,30 @@ export async function searchEmails(query: string, userId?: string) {
   // Resilient fallback to DB query
   const records = await db.emailJob.findMany({
     where: {
-      AND: [
-        userId ? { userId } : {},
-        {
-          OR: [
-            { subject: { contains: query } },
-            { body: { contains: query } },
-            { recipient: { contains: query } },
-            { sender: { contains: query } },
-          ],
-        },
+      OR: [
+        { subject: { contains: cleanQuery } },
+        { body: { contains: cleanQuery } },
+        { recipient: { contains: cleanQuery } },
+        { sender: { contains: cleanQuery } },
       ],
     },
-    take: 50,
+    take: 100,
     orderBy: { createdAt: 'desc' },
   });
 
   return records.map((r) => ({
+    id: r.id,
     emailJobId: r.id,
     userId: r.userId || undefined,
     sender: r.sender,
     recipient: r.recipient,
     subject: r.subject,
     body: r.body,
+    attachments: r.attachments ? JSON.parse(r.attachments) : [],
     status: r.status,
     scheduledAt: r.scheduledAt.toISOString(),
     sentAt: r.sentAt ? r.sentAt.toISOString() : null,
+    error: r.error,
   }));
 }
 
