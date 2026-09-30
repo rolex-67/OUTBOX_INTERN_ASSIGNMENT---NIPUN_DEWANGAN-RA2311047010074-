@@ -42,15 +42,31 @@ export async function sendEmail(opts: {
   to: string;
   subject: string;
   body: string;
+  attachments?: Array<{
+    name: string;
+    size: number;
+    type: string;
+    data?: string;
+  }>;
 }) {
   const mailer = await getTransporter();
-  const info = await mailer.sendMail({
+  const mailOptions: any = {
     from: opts.from,
     to: opts.to,
     subject: opts.subject,
-    text: opts.body,
-    html: opts.body.replace(/\n/g, '<br/>'),
-  });
+    text: opts.body.replace(/<[^>]*>/g, ''),
+    html: opts.body.includes('<') ? opts.body : opts.body.replace(/\n/g, '<br/>'),
+  };
+
+  if (opts.attachments && opts.attachments.length > 0) {
+    mailOptions.attachments = opts.attachments.map((att) => ({
+      filename: att.name,
+      path: att.data,
+      contentType: att.type,
+    }));
+  }
+
+  const info = await mailer.sendMail(mailOptions);
 
   const previewUrl = nodemailer.getTestMessageUrl(info);
   if (previewUrl) {

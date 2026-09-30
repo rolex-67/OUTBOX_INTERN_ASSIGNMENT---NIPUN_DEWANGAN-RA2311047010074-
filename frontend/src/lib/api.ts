@@ -74,6 +74,19 @@ export async function clearSentEmailsApi(): Promise<{ success: boolean; count?: 
   return res.json();
 }
 
+export async function deleteEmailById(id: string): Promise<{ success: boolean }> {
+  const res = await fetch(`${API_URL}/emails/${encodeURIComponent(id)}`, {
+    method: 'DELETE',
+    headers: { ...getAuthHeader() },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || 'Failed to delete email');
+  }
+  return res.json();
+}
+
+
 export async function searchEmails(query: string): Promise<EmailItem[]> {
   const res = await fetch(`${API_URL}/emails/search?q=${encodeURIComponent(query)}`, {
     headers: { ...getAuthHeader() },

@@ -150,3 +150,17 @@ export async function deleteSentEmailsFromIndex() {
   }
 }
 
+export async function deleteEmailFromIndex(emailJobId: string) {
+  if (!isElasticAvailable) return;
+  try {
+    await es.delete({
+      index: INDEX_NAME,
+      id: emailJobId,
+      refresh: true,
+    });
+    console.log(`Deleted email ${emailJobId} from Elasticsearch index`);
+  } catch (err: any) {
+    console.warn(`Failed to delete email ${emailJobId} from ES index:`, err.message);
+  }
+}
+

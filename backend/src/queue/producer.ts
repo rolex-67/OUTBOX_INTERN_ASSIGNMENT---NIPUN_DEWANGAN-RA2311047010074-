@@ -7,6 +7,12 @@ export interface EmailJobData {
   recipient: string;
   subject: string;
   body: string;
+  attachments?: Array<{
+    name: string;
+    size: number;
+    type: string;
+    data?: string;
+  }>;
   scheduledAt: string;
   hourlyLimit?: number;
   delayBetweenEmailsMs?: number;

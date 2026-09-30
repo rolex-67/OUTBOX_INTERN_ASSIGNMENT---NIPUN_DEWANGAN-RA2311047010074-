@@ -2,8 +2,8 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import jwt from 'jsonwebtoken';
 import { db } from '../lib/db.js';
-import { scheduleEmailJob } from '../queue/producer.js';
-import { searchEmails, indexEmail, deleteSentEmailsFromIndex } from '../lib/elastic.js';
+import { scheduleEmailJob, q } from '../queue/producer.js';
+import { searchEmails, indexEmail, deleteSentEmailsFromIndex, deleteEmailFromIndex } from '../lib/elastic.js';
 import { env } from '../config/env.js';
 
 export const apiRouter = Router();
@@ -84,6 +84,7 @@ apiRouter.post('/schedule', async (req: Request, res: Response) => {
         recipient,
         subject,
         body,
+        attachments: attachments && attachments.length > 0 ? attachments : undefined,
         scheduledAt: targetScheduledTime.toISOString(),
         hourlyLimit: limit,
         delayBetweenEmailsMs: interDelay,
@@ -176,6 +177,35 @@ const handleClearSentEmails = async (req: Request, res: Response) => {
 
 apiRouter.delete('/emails/sent', handleClearSentEmails);
 apiRouter.post('/emails/clear-sent', handleClearSentEmails);
+
+apiRouter.delete('/emails/:id', async (req: Request, res: Response) => {
+  const { id } = req.params;
+  try {
+    const existing = await db.emailJob.findUnique({ where: { id } });
+    if (!existing) {
+      return res.status(404).json({ error: 'Email job not found' });
+    }
+
+    if (existing.status === 'SCHEDULED') {
+      try {
+        const bullJob = await q.getJob(existing.id);
+        if (bullJob) {
+          await bullJob.remove();
+        }
+      } catch (err: any) {
+        console.warn(`Could not remove BullMQ job ${existing.id}:`, err.message);
+      }
+    }
+
+    await db.emailJob.delete({ where: { id } });
+    await deleteEmailFromIndex(id);
+
+    return res.json({ success: true, message: 'Email deleted successfully' });
+  } catch (err: any) {
+    console.error('Failed to delete email:', err.message);
+    return res.status(500).json({ error: 'Failed to delete email' });
+  }
+});
 
 apiRouter.get('/emails/search', async (req: Request, res: Response) => {
   const query = (req.query.q as string) || '';

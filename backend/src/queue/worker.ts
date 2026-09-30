@@ -94,6 +94,7 @@ export function createEmailWorker(concurrency = 5) {
         to: recipient,
         subject,
         body,
+        attachments: job.data.attachments,
       });
 
       try {
