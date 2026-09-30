@@ -9,6 +9,12 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        primary: {
+          DEFAULT: '#00A854',
+          hover: '#009247',
+          light: '#E6F4EA',
+          mint: '#EBF5F0',
+        },
         brand: {
           50: '#eef2ff',
           100: '#e0e7ff',

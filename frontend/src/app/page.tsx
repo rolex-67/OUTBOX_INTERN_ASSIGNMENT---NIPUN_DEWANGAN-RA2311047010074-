@@ -2,19 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import {
-  Mail,
-  Clock,
-  ShieldCheck,
-  Zap,
-  ArrowRight,
-  Sparkles,
-  User,
-  KeyRound,
-  CheckCircle2,
-  AlertCircle,
-  HelpCircle,
-} from 'lucide-react';
 import { GoogleOAuthProvider, GoogleLogin, CredentialResponse } from '@react-oauth/google';
 import { directLoginApi, googleLoginApi } from '@/lib/api';
 
@@ -22,11 +9,9 @@ export default function LoginPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [loginMethod, setLoginMethod] = useState<'direct' | 'google'>('direct');
 
-  // Direct login form fields
   const [email, setEmail] = useState('');
-  const [name, setName] = useState('');
+  const [password, setPassword] = useState('');
 
   const googleClientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID || '';
 
@@ -37,7 +22,6 @@ export default function LoginPage() {
     }
   }, [router]);
 
-  // Decode Google ID Token (JWT) payload
   function parseJwt(token: string) {
     try {
       const base64Url = token.split('.')[1];
@@ -55,31 +39,28 @@ export default function LoginPage() {
     }
   }
 
-  async function handleLogin(targetEmail: string, targetName?: string, avatar?: string) {
-    if (!targetEmail.trim()) {
-      setError('Please provide a valid email address');
-      return;
-    }
+  async function handleDirectLogin(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const targetEmail = email.trim() || 'oliver.brown@domain.io';
+    const targetName = targetEmail.split('@')[0]
+      .split('.')
+      .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+      .join(' ') || 'Oliver Brown';
 
     setLoading(true);
     setError(null);
     try {
-      const cleanEmail = targetEmail.trim().toLowerCase();
-      const cleanName = targetName?.trim() || cleanEmail.split('@')[0];
-      const userAvatar =
-        avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(cleanName)}`;
-
       const data = await directLoginApi({
-        email: cleanEmail,
-        name: cleanName,
-        avatar: userAvatar,
+        email: targetEmail,
+        name: targetName,
+        avatar: `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80`,
       });
 
       localStorage.setItem('token', data.token);
       localStorage.setItem('user', JSON.stringify(data.user));
       router.push('/dashboard');
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please verify the backend is running on port 5000.');
+      setError(err.message || 'Login failed. Please verify the backend is running.');
     } finally {
       setLoading(false);
     }
@@ -95,9 +76,11 @@ export default function LoginPage() {
     setError(null);
     try {
       const payload = parseJwt(credentialResponse.credential);
-      const googleEmail = payload?.email || 'google.user@reachinbox.ai';
-      const googleName = payload?.name || 'Google User';
-      const googleAvatar = payload?.picture || `https://api.dicebear.com/7.x/avataaars/svg?seed=${encodeURIComponent(googleName)}`;
+      const googleEmail = payload?.email || 'oliver.brown@domain.io';
+      const googleName = payload?.name || 'Oliver Brown';
+      const googleAvatar =
+        payload?.picture ||
+        `https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=120&auto=format&fit=crop&q=80`;
 
       const data = await googleLoginApi({
         email: googleEmail,
@@ -115,250 +98,122 @@ export default function LoginPage() {
     }
   }
 
-
   return (
-    <div className="relative min-h-screen flex flex-col justify-center items-center px-4 py-8 overflow-hidden bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950">
-      {/* Background ambient lighting */}
-      <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[650px] h-[350px] bg-indigo-500/10 rounded-full blur-[140px] pointer-events-none" />
-      <div className="absolute bottom-10 right-10 w-[350px] h-[350px] bg-purple-500/10 rounded-full blur-[120px] pointer-events-none" />
+    <div className="min-h-screen w-full flex flex-col justify-center items-center bg-white px-4 py-12">
+      {/* Centered Figma Login Card */}
+      <div className="w-full max-w-[420px] bg-white border border-gray-200/90 rounded-2xl p-8 sm:p-10 shadow-sm">
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 text-center mb-6">
+          Login
+        </h1>
 
-      <div className="relative z-10 max-w-lg w-full">
-        {/* Brand header */}
-        <div className="text-center mb-6">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 text-indigo-400 text-xs font-semibold uppercase tracking-wider mb-3">
-            <Sparkles className="w-3.5 h-3.5" /> ReachInbox Scheduler
+        {error && (
+          <div className="mb-4 p-3 text-xs bg-red-50 border border-red-200 text-red-600 rounded-xl text-center">
+            {error}
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-white mb-2">
-            Cold Outreach Engine
-          </h1>
-          <p className="text-slate-400 text-xs sm:text-sm max-w-md mx-auto">
-            Fault-tolerant distributed email scheduling backed by BullMQ, Redis, and Elasticsearch.
-          </p>
-        </div>
+        )}
 
-        {/* Instant Access Banner */}
-        <div className="mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-indigo-900/40 via-purple-900/30 to-indigo-900/40 border border-indigo-500/30 shadow-lg backdrop-blur-md">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-start gap-2.5">
-              <span className="flex h-2.5 w-2.5 rounded-full bg-emerald-400 animate-pulse mt-1 shrink-0" />
-              <div>
-                <div className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
-                  Instant Demo Access
-                </div>
-                <div className="text-[11px] text-slate-300 mt-0.5">
-                  Skip sign-in and jump straight into the dashboard demo.
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={() => handleLogin('demo@reachinbox.ai', 'Demo User')}
-              disabled={loading}
-              className="shrink-0 px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs shadow-md shadow-indigo-600/30 flex items-center gap-1.5 transition-all duration-150 active:scale-95"
-            >
-              <Zap className="w-3.5 h-3.5 fill-current" />
-              <span>{loading ? 'Entering...' : '1-Click Demo'}</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Main Card */}
-        <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 sm:p-7 shadow-2xl backdrop-blur-xl">
-          {/* Method Selector Tabs */}
-          <div className="flex rounded-xl bg-slate-950 p-1 border border-slate-800 mb-5">
-            <button
-              type="button"
-              onClick={() => {
-                setLoginMethod('direct');
-                setError(null);
-              }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all ${
-                loginMethod === 'direct'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <Mail className="w-3.5 h-3.5" />
-              <span>Email Sign In</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setLoginMethod('google');
-                setError(null);
-              }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2 text-xs font-semibold rounded-lg transition-all ${
-                loginMethod === 'google'
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
-                  : 'text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              <KeyRound className="w-3.5 h-3.5" />
-              <span>Google OAuth</span>
-            </button>
-          </div>
-
-          {error && (
-            <div className="mb-4 p-3 text-xs bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl flex items-start gap-2">
-              <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
-              <div>{error}</div>
-            </div>
-          )}
-
-          {/* METHOD 1: Direct Sign In */}
-          {loginMethod === 'direct' && (
-            <form
-              onSubmit={(e) => {
-                e.preventDefault();
-                handleLogin(email, name);
-              }}
-              className="space-y-4"
-            >
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Email Address
-                </label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type="email"
-                    required
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="you@company.ai"
-                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
-                  Full Name
-                </label>
-                <div className="relative">
-                  <User className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                  <input
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Your Name (optional)"
-                    className="w-full pl-9 pr-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-200 text-xs placeholder-slate-600 focus:outline-none focus:border-indigo-500 transition-colors"
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className="w-full py-2.5 px-4 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl font-semibold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/25 transition-all duration-150 active:scale-95"
-              >
-                <span>{loading ? 'Authenticating...' : 'Sign In to Dashboard'}</span>
-                <ArrowRight className="w-3.5 h-3.5" />
-              </button>
-            </form>
-          )}
-
-          {/* METHOD 2: Google OAuth */}
-          {loginMethod === 'google' && (
-            <div className="space-y-4 py-1">
-              {googleClientId ? (
-                <div className="flex flex-col items-center gap-3">
-                  <div className="w-full flex justify-center py-1">
-                    <GoogleOAuthProvider clientId={googleClientId}>
-                      <GoogleLogin
-                        onSuccess={handleGoogleSuccess}
-                        onError={() =>
-                          setError(
-                            'Google Sign-In failed or was cancelled. Tip: Use "Direct Sign In" tab for instant reviewer access.'
-                          )
-                        }
-                        theme="filled_black"
-                        shape="pill"
-                        size="large"
-                        text="signin_with"
-                      />
-                    </GoogleOAuthProvider>
-                  </div>
-                  <p className="text-[11px] text-slate-400 text-center">
-                    Using Google OAuth client from <code className="text-slate-300">.env.local</code>
-                  </p>
-                </div>
-              ) : (
-                <div className="p-3.5 rounded-xl bg-slate-950/70 border border-slate-800 text-center">
-                  <HelpCircle className="w-6 h-6 text-amber-400 mx-auto mb-1.5" />
-                  <p className="text-xs text-slate-200 font-semibold mb-0.5">
-                    Google Client ID not configured
-                  </p>
-                  <p className="text-[11px] text-slate-400 mb-3">
-                    Add <code className="text-indigo-400">NEXT_PUBLIC_GOOGLE_CLIENT_ID</code> in{' '}
-                    <code className="text-slate-300">.env.local</code>, or use simulated Google login below.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      handleLogin('google.reviewer@reachinbox.ai', 'Google Demo Reviewer')
+        <div className="space-y-4">
+          {/* Google Login Button (Figma mint style) */}
+          {googleClientId ? (
+            <div className="w-full">
+              <GoogleOAuthProvider clientId={googleClientId}>
+                <div className="w-full flex justify-center">
+                  <GoogleLogin
+                    onSuccess={handleGoogleSuccess}
+                    onError={() =>
+                      setError('Google Sign-In failed. You can sign in using email below.')
                     }
-                    disabled={loading}
-                    className="w-full py-2 px-3 rounded-lg bg-white hover:bg-slate-100 text-slate-900 font-medium text-xs flex items-center justify-center gap-2 transition-colors"
-                  >
-                    <span>Continue with Simulated Google SSO</span>
-                  </button>
+                    theme="outline"
+                    shape="pill"
+                    size="large"
+                    width="340"
+                    text="continue_with"
+                  />
                 </div>
-              )}
-
-              {/* Fallback button */}
-              <div className="pt-2 text-center border-t border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => setLoginMethod('direct')}
-                  className="text-[11px] text-indigo-400 hover:text-indigo-300 underline underline-offset-2"
-                >
-                  Prefer passwordless direct login? Click here
-                </button>
-              </div>
+              </GoogleOAuthProvider>
             </div>
+          ) : (
+            <button
+              type="button"
+              onClick={() => handleDirectLogin()}
+              disabled={loading}
+              className="w-full flex items-center justify-center gap-3 py-3 px-4 bg-[#EBF5F0] hover:bg-[#e0efe7] text-gray-700 font-medium text-sm rounded-xl transition-colors border border-transparent shadow-none"
+            >
+              <svg className="w-4 h-4" viewBox="0 0 24 24">
+                <path
+                  fill="#4285F4"
+                  d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+                />
+                <path
+                  fill="#34A853"
+                  d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.34 24 12 24z"
+                />
+                <path
+                  fill="#FBBC05"
+                  d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
+                />
+                <path
+                  fill="#EA4335"
+                  d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+                />
+              </svg>
+              <span>Login with Google</span>
+            </button>
           )}
 
-          {/* Feature Badges */}
-          <div className="relative flex py-4 items-center">
-            <div className="flex-grow border-t border-slate-800"></div>
-            <span className="flex-shrink mx-3 text-slate-500 text-[10px] uppercase tracking-wider font-semibold">
-              System Architecture
+          {/* Divider */}
+          <div className="relative flex py-2 items-center">
+            <div className="flex-grow border-t border-gray-200"></div>
+            <span className="flex-shrink mx-3 text-gray-400 text-xs font-normal">
+              or sign up through email
             </span>
-            <div className="flex-grow border-t border-slate-800"></div>
+            <div className="flex-grow border-t border-gray-200"></div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-400">
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-950/50 border border-slate-800">
-              <Clock className="w-3.5 h-3.5 text-indigo-400 shrink-0" />
-              <span>Zero Cron Jobs</span>
+          {/* Form */}
+          <form onSubmit={handleDirectLogin} className="space-y-3">
+            <div>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email ID"
+                className="w-full px-4 py-3 bg-[#F3F4F6] border-none rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#00A854]/30 transition-all"
+              />
             </div>
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-950/50 border border-slate-800">
-              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-              <span>Restart Persistent</span>
-            </div>
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-950/50 border border-slate-800">
-              <Zap className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span>Atomic Rate Limits</span>
-            </div>
-            <div className="flex items-center gap-2 p-2 rounded-lg bg-slate-950/50 border border-slate-800">
-              <Mail className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
-              <span>Ethereal SMTP</span>
-            </div>
-          </div>
-        </div>
 
-        {/* Footer */}
-        <div className="mt-5 text-center space-y-1">
-          <p className="text-xs font-bold tracking-wider text-slate-300 uppercase">
-            MADE BY NIPUN DEWANGAN
-          </p>
-          <p className="text-[11px] font-mono font-medium text-indigo-400 tracking-wider">
-            RA2311047010074
-          </p>
-          <p className="text-[10px] text-slate-500">
-            ReachInbox Hiring Assignment • Full-stack Email Job Scheduler
-          </p>
+            <div>
+              <input
+                type="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="Password"
+                className="w-full px-4 py-3 bg-[#F3F4F6] border-none rounded-xl text-sm text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#00A854]/30 transition-all"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-2 py-3 px-4 bg-[#00A854] hover:bg-[#009247] active:scale-[0.99] text-white font-medium text-sm rounded-xl transition-all shadow-sm disabled:opacity-60"
+            >
+              {loading ? 'Logging in...' : 'Login'}
+            </button>
+          </form>
         </div>
+      </div>
+
+      {/* Footer */}
+      <div className="mt-8 text-center space-y-1">
+        <p className="text-xs font-bold tracking-wider text-gray-500 uppercase">
+          MADE BY NIPUN DEWANGAN
+        </p>
+        <p className="text-[11px] font-mono font-medium text-[#00A854] tracking-wider">
+          RA2311047010074
+        </p>
+        <p className="text-[11px] text-gray-400">
+          ReachInbox Hiring Assignment • Full-stack Email Job Scheduler
+        </p>
       </div>
     </div>
   );
