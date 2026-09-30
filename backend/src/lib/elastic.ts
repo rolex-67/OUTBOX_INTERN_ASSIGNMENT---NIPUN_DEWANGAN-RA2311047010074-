@@ -107,10 +107,10 @@ export async function searchEmails(query: string, userId?: string) {
         userId ? { userId } : {},
         {
           OR: [
-            { subject: { contains: query, mode: 'insensitive' } },
-            { body: { contains: query, mode: 'insensitive' } },
-            { recipient: { contains: query, mode: 'insensitive' } },
-            { sender: { contains: query, mode: 'insensitive' } },
+            { subject: { contains: query } },
+            { body: { contains: query } },
+            { recipient: { contains: query } },
+            { sender: { contains: query } },
           ],
         },
       ],
