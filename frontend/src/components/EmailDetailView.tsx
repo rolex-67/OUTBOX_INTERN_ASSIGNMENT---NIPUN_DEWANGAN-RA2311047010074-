@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowLeft, Star, Archive, Trash2, ChevronDown, Paperclip, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Star, Archive, Trash2, ChevronDown, Paperclip, FileText, Download } from 'lucide-react';
 import { EmailItem } from '@/lib/api';
 
 interface EmailDetailViewProps {
@@ -26,7 +26,16 @@ export function EmailDetailView({ email, onBack, onDelete }: EmailDetailViewProp
     }
   }
 
+  function formatBytes(bytes?: number) {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
+  }
+
   const senderInitial = (email.sender || 'U').charAt(0).toUpperCase();
+  const attachments = Array.isArray(email.attachments) ? email.attachments : [];
 
   return (
     <div className="w-full bg-white flex flex-col min-h-screen">
@@ -62,13 +71,6 @@ export function EmailDetailView({ email, onBack, onDelete }: EmailDetailViewProp
               <Trash2 className="w-4 h-4" />
             </button>
           )}
-          <div className="w-7 h-7 rounded-full bg-gray-200 overflow-hidden ml-1">
-            <img
-              src="https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=80&auto=format&fit=crop&q=80"
-              alt="Profile"
-              className="w-full h-full object-cover"
-            />
-          </div>
         </div>
       </div>
 
@@ -101,62 +103,65 @@ export function EmailDetailView({ email, onBack, onDelete }: EmailDetailViewProp
           </div>
         </div>
 
-        {/* Message Body */}
+        {/* Real Message Body Only (No hardcoded templates) */}
         <div className="text-sm text-gray-800 leading-relaxed space-y-4 pt-4 border-t border-gray-100">
           <p className="whitespace-pre-line">{email.body}</p>
-
-          {/* Yellow Callout Quote Box (matches Image 4) */}
-          <div className="border-l-4 border-amber-400 bg-amber-50/60 p-4 rounded-r-xl space-y-1.5 my-6 text-xs text-gray-800">
-            <div className="font-semibold text-amber-900 flex items-center gap-1.5">
-              <span>⚡</span> Extremely Exclusive—Only 4 Spots Worldwide Per Year | $25,000 investment <span>⚡</span>
-            </div>
-            <div className="text-gray-700">
-              To explore securing your private transformation, simply reply right now with <strong className="text-gray-900">&quot;FLY OUT FIX&quot;</strong>.
-            </div>
-          </div>
-
-          <p className="text-xs text-gray-500 italic pt-2">
-            P.S. Always remember that you can develop world class technique! 🚀
-          </p>
         </div>
 
-        {/* Sample Attachment Previews (matches Image 4) */}
-        <div className="pt-6 border-t border-gray-100">
-          <div className="flex items-center gap-2 text-xs font-semibold text-gray-700 mb-3">
-            <Paperclip className="w-3.5 h-3.5" />
-            <span>2 Attachments</span>
-          </div>
-
-          <div className="flex flex-wrap gap-4">
-            <div className="w-48 border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white hover:border-gray-300 transition-colors cursor-pointer">
-              <div className="h-24 bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-white relative">
-                <img
-                  src="https://images.unsplash.com/photo-1595435934249-5df7ed86e1c0?w=300&auto=format&fit=crop&q=80"
-                  alt="Tennis Coach Profile"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="p-2.5">
-                <div className="text-xs font-medium text-gray-800 truncate">Tennis_Coach_Profile.png</div>
-                <div className="text-[10px] text-gray-400 mt-0.5">1.2 MB</div>
-              </div>
+        {/* Real Uploaded Attachments Section (Rendered ONLY if user actually attached files) */}
+        {attachments.length > 0 && (
+          <div className="pt-6 border-t border-gray-100">
+            <div className="flex items-center gap-2 text-xs font-semibold text-gray-700 mb-3">
+              <Paperclip className="w-3.5 h-3.5 text-[#00A854]" />
+              <span>
+                {attachments.length} {attachments.length === 1 ? 'Attachment' : 'Attachments'}
+              </span>
             </div>
 
-            <div className="w-48 border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white hover:border-gray-300 transition-colors cursor-pointer">
-              <div className="h-24 bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white relative">
-                <img
-                  src="https://images.unsplash.com/photo-1534438327276-14e5300c3a48?w=300&auto=format&fit=crop&q=80"
-                  alt="Tennis Coach Profile 2"
-                  className="w-full h-full object-cover"
-                />
-              </div>
-              <div className="p-2.5">
-                <div className="text-xs font-medium text-gray-800 truncate">Tennis_Coach_Profile2.png</div>
-                <div className="text-[10px] text-gray-400 mt-0.5">1.2 MB</div>
-              </div>
+            <div className="flex flex-wrap gap-4">
+              {attachments.map((file, i) => {
+                const isImage = file.type?.startsWith('image/') && file.data;
+                return (
+                  <div
+                    key={i}
+                    className="w-48 border border-gray-200 rounded-xl overflow-hidden shadow-sm bg-white hover:border-gray-300 transition-colors"
+                  >
+                    {isImage ? (
+                      <div className="h-28 bg-gray-50 overflow-hidden relative border-b border-gray-100">
+                        <img
+                          src={file.data}
+                          alt={file.name}
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+                    ) : (
+                      <div className="h-20 bg-gray-50 flex items-center justify-center text-gray-400 border-b border-gray-100">
+                        <FileText className="w-8 h-8 text-gray-400" />
+                      </div>
+                    )}
+                    <div className="p-2.5">
+                      <div className="text-xs font-medium text-gray-800 truncate" title={file.name}>
+                        {file.name}
+                      </div>
+                      <div className="flex items-center justify-between mt-1 text-[10px] text-gray-400">
+                        <span>{formatBytes(file.size)}</span>
+                        {file.data && (
+                          <a
+                            href={file.data}
+                            download={file.name}
+                            className="text-[#00A854] hover:underline flex items-center gap-0.5"
+                          >
+                            <Download className="w-2.5 h-2.5" /> Download
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );

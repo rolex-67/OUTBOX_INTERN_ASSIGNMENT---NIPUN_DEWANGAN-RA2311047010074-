@@ -6,7 +6,6 @@ import {
   ArrowLeft,
   Paperclip,
   Clock,
-  Calendar,
   Upload,
   X,
   Undo,
@@ -21,9 +20,9 @@ import {
   Link as LinkIcon,
   Strikethrough,
   ChevronDown,
-  Sparkles,
+  FileText,
 } from 'lucide-react';
-import { scheduleEmails, SchedulePayload } from '@/lib/api';
+import { scheduleEmails, SchedulePayload, EmailAttachment } from '@/lib/api';
 
 interface ComposeViewProps {
   onBack: () => void;
@@ -39,6 +38,9 @@ export function ComposeView({ onBack, onSuccess, defaultSender }: ComposeViewPro
   const [body, setBody] = useState('');
   const [delayBetweenSends, setDelayBetweenSends] = useState(2);
   const [hourlyLimit, setHourlyLimit] = useState(50);
+
+  // Attachments state
+  const [attachments, setAttachments] = useState<EmailAttachment[]>([]);
 
   // Send later popover state
   const [showSendLater, setShowSendLater] = useState(false);
@@ -73,6 +75,42 @@ export function ComposeView({ onBack, onSuccess, defaultSender }: ComposeViewPro
         setError('Failed to parse uploaded list file');
       },
     });
+  }
+
+  function handleFileAttach(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        setAttachments((prev) => [
+          ...prev,
+          {
+            name: file.name,
+            size: file.size,
+            type: file.type || 'application/octet-stream',
+            data: dataUrl,
+          },
+        ]);
+      };
+      reader.readAsDataURL(file);
+    });
+
+    e.target.value = '';
+  }
+
+  function handleRemoveAttachment(idx: number) {
+    setAttachments((prev) => prev.filter((_, i) => i !== idx));
+  }
+
+  function formatBytes(bytes?: number) {
+    if (!bytes || bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
   }
 
   function handleAddRecipient() {
@@ -134,6 +172,7 @@ export function ComposeView({ onBack, onSuccess, defaultSender }: ComposeViewPro
         recipients: finalRecipients,
         subject: subject.trim(),
         body: body.trim() || 'Hi there, following up on our previous conversation.',
+        attachments: attachments.length > 0 ? attachments : undefined,
         startTime: scheduledTime || undefined,
         delayBetweenEmailsMs: delayBetweenSends * 1000,
         hourlyLimit,
@@ -151,6 +190,15 @@ export function ComposeView({ onBack, onSuccess, defaultSender }: ComposeViewPro
 
   return (
     <div className="w-full bg-white flex flex-col min-h-screen relative">
+      {/* Hidden file input for attachments */}
+      <input
+        type="file"
+        id="compose-file-attachments"
+        multiple
+        onChange={handleFileAttach}
+        className="hidden"
+      />
+
       {/* Top Navigation Bar */}
       <div className="h-16 border-b border-gray-100 px-6 sm:px-10 flex items-center justify-between bg-white sticky top-0 z-20">
         <div className="flex items-center gap-3">
@@ -167,16 +215,22 @@ export function ComposeView({ onBack, onSuccess, defaultSender }: ComposeViewPro
 
         {/* Right Action Icons & Send Later button */}
         <div className="flex items-center gap-4 relative">
+          {/* Functional Attachment Button */}
           <button
-            className="relative p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors"
+            type="button"
+            onClick={() => document.getElementById('compose-file-attachments')?.click()}
+            className="relative p-2 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors cursor-pointer"
             title="Attach files"
           >
             <Paperclip className="w-4 h-4 text-emerald-600" />
-            <span className="absolute -top-1 -right-1 text-[10px] text-gray-500 font-medium">
-              1
-            </span>
+            {attachments.length > 0 && (
+              <span className="absolute -top-1 -right-1 text-[10px] text-white bg-[#00A854] w-4 h-4 rounded-full flex items-center justify-center font-bold">
+                {attachments.length}
+              </span>
+            )}
           </button>
 
+          {/* Schedule Clock Button */}
           <button
             onClick={() => setShowSendLater((prev) => !prev)}
             className={`p-2 rounded-full transition-colors ${
@@ -423,6 +477,46 @@ export function ComposeView({ onBack, onSuccess, defaultSender }: ComposeViewPro
           )}
         </div>
 
+        {/* Real Attached Files Section */}
+        {attachments.length > 0 && (
+          <div className="p-3 bg-gray-50/80 border border-gray-200 rounded-xl space-y-2">
+            <div className="flex items-center justify-between text-xs text-gray-600">
+              <span className="font-semibold flex items-center gap-1.5 text-gray-800">
+                <Paperclip className="w-3.5 h-3.5 text-[#00A854]" />
+                <span>Attached Files ({attachments.length})</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => document.getElementById('compose-file-attachments')?.click()}
+                className="text-[11px] text-[#00A854] hover:underline"
+              >
+                + Add more
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              {attachments.map((file, idx) => (
+                <div
+                  key={idx}
+                  className="inline-flex items-center gap-2 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-xs text-gray-800 shadow-sm"
+                >
+                  <FileText className="w-3.5 h-3.5 text-gray-400" />
+                  <span className="font-medium truncate max-w-[180px]">{file.name}</span>
+                  <span className="text-[10px] text-gray-400">({formatBytes(file.size)})</span>
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveAttachment(idx)}
+                    className="p-0.5 text-gray-400 hover:text-red-500 rounded transition-colors"
+                    title="Remove attachment"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* RICH TEXT EDITOR CARD (Matches Image 5 & 6) */}
         <div className="rounded-2xl border border-gray-100 bg-[#F9FAFB] p-4 space-y-3 min-h-[360px] flex flex-col shadow-sm">
           {/* Editor Toolbar */}
@@ -474,6 +568,18 @@ export function ComposeView({ onBack, onSuccess, defaultSender }: ComposeViewPro
             </button>
             <button type="button" className="p-1 hover:text-gray-900 rounded">
               <Strikethrough className="w-3.5 h-3.5" />
+            </button>
+
+            <span className="h-4 w-px bg-gray-200 mx-1"></span>
+
+            <button
+              type="button"
+              onClick={() => document.getElementById('compose-file-attachments')?.click()}
+              className="p-1 hover:text-[#00A854] rounded flex items-center gap-1 text-[11px] text-gray-500"
+              title="Attach files"
+            >
+              <Paperclip className="w-3.5 h-3.5" />
+              <span>Attach</span>
             </button>
           </div>
 

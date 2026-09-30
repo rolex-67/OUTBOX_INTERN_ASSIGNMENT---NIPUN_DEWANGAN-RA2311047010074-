@@ -31,7 +31,8 @@ model EmailJob {
   sender      String
   recipient   String
   subject     String
-  body        String    @db.Text
+  body        String    @db.LongText
+  attachments String?   @db.LongText
   scheduledAt DateTime
   sentAt      DateTime?
   status      JobStatus @default(SCHEDULED)

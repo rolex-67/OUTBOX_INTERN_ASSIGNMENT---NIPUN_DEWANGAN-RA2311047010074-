@@ -29,6 +29,16 @@ const scheduleSchema = z.object({
   recipients: z.array(z.string().email()).min(1),
   subject: z.string().min(1),
   body: z.string().min(1),
+  attachments: z
+    .array(
+      z.object({
+        name: z.string(),
+        size: z.number(),
+        type: z.string(),
+        data: z.string().optional(),
+      })
+    )
+    .optional(),
   startTime: z.string().optional(),
   delayBetweenEmailsMs: z.coerce.number().min(0).optional(),
   hourlyLimit: z.coerce.number().min(1).optional(),
@@ -40,7 +50,7 @@ apiRouter.post('/schedule', async (req: Request, res: Response) => {
     return res.status(400).json({ error: parsed.error.flatten().fieldErrors });
   }
 
-  const { sender, recipients, subject, body, startTime, delayBetweenEmailsMs, hourlyLimit } = parsed.data;
+  const { sender, recipients, subject, body, attachments, startTime, delayBetweenEmailsMs, hourlyLimit } = parsed.data;
   const auth = getAuthUser(req);
 
   const baseStartTime = startTime ? new Date(startTime).getTime() : Date.now();
@@ -61,6 +71,7 @@ apiRouter.post('/schedule', async (req: Request, res: Response) => {
         recipient,
         subject,
         body,
+        attachments: attachments && attachments.length > 0 ? JSON.stringify(attachments) : null,
         scheduledAt: targetScheduledTime,
         status: 'SCHEDULED',
       },
@@ -116,7 +127,12 @@ apiRouter.get('/emails/scheduled', async (req: Request, res: Response) => {
     take: 200,
   });
 
-  return res.json({ emails });
+  return res.json({
+    emails: emails.map((e) => ({
+      ...e,
+      attachments: e.attachments ? JSON.parse(e.attachments) : [],
+    })),
+  });
 });
 
 apiRouter.get('/emails/sent', async (req: Request, res: Response) => {
@@ -128,7 +144,12 @@ apiRouter.get('/emails/sent', async (req: Request, res: Response) => {
     take: 200,
   });
 
-  return res.json({ emails });
+  return res.json({
+    emails: emails.map((e) => ({
+      ...e,
+      attachments: e.attachments ? JSON.parse(e.attachments) : [],
+    })),
+  });
 });
 
 // Clear sent email logs from DB and Elasticsearch

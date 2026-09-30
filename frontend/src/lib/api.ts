@@ -6,6 +6,13 @@ function getAuthHeader(): Record<string, string> {
   return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
+export interface EmailAttachment {
+  name: string;
+  size: number;
+  type: string;
+  data?: string;
+}
+
 export interface EmailItem {
   id?: string;
   emailJobId?: string;
@@ -13,6 +20,7 @@ export interface EmailItem {
   recipient: string;
   subject: string;
   body: string;
+  attachments?: EmailAttachment[];
   status: 'SCHEDULED' | 'SENT' | 'FAILED';
   scheduledAt: string;
   sentAt?: string | null;
@@ -24,6 +32,7 @@ export interface SchedulePayload {
   recipients: string[];
   subject: string;
   body: string;
+  attachments?: EmailAttachment[];
   startTime?: string;
   delayBetweenEmailsMs?: number;
   hourlyLimit?: number;
